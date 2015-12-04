@@ -1,0 +1,265 @@
+<head>
+	<title>Venue finder</title>
+    <script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=false&libraries=geometry"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_API_KEY&libraries=places&callback=initAutocomplete" async defer></script>
+    <script>
+		//Функція створення і завантаження CSV-файлу
+        $(document).ready(function() {
+            function exportTableToCSV($table, filename) {
+                var $headers = $table.find('tr:has(th)'),
+                    $rows = $table.find('tr:has(td)'),
+                    tmpColDelim = String.fromCharCode(11) 
+                    ,
+                    tmpRowDelim = String.fromCharCode(0) 
+                    ,
+                    colDelim = '","',
+                    rowDelim = '"\r\n"';
+                
+                var csv = '"';
+                csv += formatRows($headers.map(grabRow));
+                csv += rowDelim;
+                csv += formatRows($rows.map(grabRow)) + '"';
+                var csvData = 'data:application/csv;charset=utf-8,' + encodeURIComponent(csv);
+                $(this)
+                    .attr({
+                        'download': filename,
+                        'href': csvData
+                    });
+                //Вивід з відповідними розподільниками
+                function formatRows(rows) {
+                    return rows.get().join(tmpRowDelim)
+                        .split(tmpRowDelim).join(rowDelim)
+                        .split(tmpColDelim).join(colDelim);
+                }
+
+                //Форматування рядків таблиці
+                function grabRow(i, row) {
+                    var $row = $(row);
+                    var $cols = $row.find('td');
+                    if (!$cols.length) $cols = $row.find('th');
+                    return $cols.map(grabCol)
+                        .get().join(tmpColDelim);
+                }
+                //Форматування стовпців таблиці
+                function grabCol(j, col) {
+                    var $col = $(col),
+                        $text = $col.text();
+                    return $text.replace('"', '""');
+                }
+            }
+            $("#export").click(function(event) {
+                var outputFile = window.prompt("Name of csv-file") || 'export';
+                outputFile = outputFile.replace('.csv', '') + '.csv'
+                exportTableToCSV.apply(this, [$('#datat>table'), outputFile]);
+            });
+        });
+
+		//Функція розрахунку радіусу між центром і точкою
+        function calcDistance(venue1, venue2) {
+            return (google.maps.geometry.spherical.computeDistanceBetween(venue1, venue2) / 1000).toFixed(2);
+        }
+
+		//Завантаження карти і позначень на карті
+        function initAutocomplete() {
+            var map = new google.maps.Map(document.getElementById('map'), {
+                center: {
+                    lat: 35.6788042,
+                    lng: 139.7667007
+                },
+                zoom: 13,
+                mapTypeId: google.maps.MapTypeId.ROADMAP
+            });
+			
+            var firstLocation = 1; //Змінна для збереження координат в історію 
+            var maxradius = 0; //Змінна для визначення найбільшого радіусу з всіх маркерів
+            var centerMap = new google.maps.LatLng(35.6788, 139.7667);
+            var input = document.getElementById('pac-input');
+            var searchBox = new google.maps.places.SearchBox(input);
+           
+		   map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
+            map.addListener('bounds_changed', function() {
+                searchBox.setBounds(map.getBounds());
+            });
+		
+            var markers = [];
+            searchBox.addListener('places_changed', function() {
+                firstLocation = 1; 
+                var places = searchBox.getPlaces();
+                if (places.length == 0) {
+                    return;
+                }
+
+				maxradius = 0;
+                document.getElementById("radiusList").value = "";
+                document.getElementById("qlist").value = ""; //qlist-запис координат першої точки
+				
+				//Основна таблиця з даними
+                var table1 = document.getElementById("list");
+                while (table1.rows.length > 0) {
+                    table1.deleteRow(0);
+                }
+
+				//Заголовок таблиці
+				document.getElementById("list").innerHTML +=
+                        "<tr><td>" + "№" + "</td><td>" + "NAME" + "</td><td>" + "FULL ADDRESS" +
+                        "</td><td>" + "LATITUDE" + "</td><td>" + "LONGITUDE" + "</td></tr>";
+                    
+                //Очистка старих маркерів
+                markers.forEach(function(marker) {
+                    marker.setMap(null);
+                });
+                markers = [];
+                
+				var venueCount = 1; //Кількість знайдених точок
+                var bounds = new google.maps.LatLngBounds();
+                places.forEach(function(place) {
+                    var icon = {
+                        url: place.icon,
+                        size: new google.maps.Size(71, 71),
+                        origin: new google.maps.Point(0, 0),
+                        anchor: new google.maps.Point(17, 34),
+                        scaledSize: new google.maps.Size(25, 25)
+                    };
+                    
+					//Визначення найбільшого радіусу
+					var radius = calcDistance(centerMap, place.geometry.location); 
+                    if (radius > maxradius) {
+                        maxradius = radius;
+                        document.getElementById("radiusList").value = maxradius;
+                    }
+
+					//Вставка в таблицю номеру, назви, адреси, широти, довготи точки
+                    document.getElementById("list").innerHTML +=
+                        "<tr><td>" + venueCount + "</td><td>" + place.name + "</td><td>" + place.formatted_address +
+                        "</td><td>" + place.geometry.location.lat() + "</td><td>" + place.geometry.location.lng() + "</td></tr>";
+                    
+					venueCount++;
+					if (firstLocation == 1) {
+                        document.getElementById("qlist").value += place.geometry.location;
+                        firstLocation++;
+                    }
+
+                    //Створення маркерів на карті
+                    markers.push(new google.maps.Marker({
+                        map: map,
+                        icon: icon,
+                        title: place.name,
+                        position: place.geometry.location
+                    }));
+
+                    if (place.geometry.viewport) {
+                        bounds.union(place.geometry.viewport);
+                    } else {
+                        bounds.extend(place.geometry.location);
+                    }
+                });
+
+                document.getElementById("list").style.visibility = "visible";
+                document.getElementById("export").style.visibility = "visible";
+                document.getElementById("history").style.visibility = "visible";
+                document.getElementById("footer").style.visibility = "visible";
+                
+				if (venueCount - 1 == 0) {
+                    document.getElementById("list").style.visibility = "hidden";
+                    document.getElementById("export").style.visibility = "hidden";
+                    document.getElementById("history").style.visibility = "hidden";
+                    document.getElementById("footer").style.visibility = "hidden";
+                    document.getElementById("councountList").innerHTML = "Not found any venue";
+                } else if (venueCount - 1 == 1) document.getElementById("countList").innerHTML = "1 venue";
+                else document.getElementById("countList").innerHTML = venueCount - 1 + " venues";
+                $("table:second").empty();
+                map.fitBounds(bounds);
+            });
+        }
+    </script>
+</head>
+
+<body>
+    {{>store}}
+</body>
+
+<template name="store">
+    <form id="blogForm">
+        <div class="row">
+			<div class="col-md-1" align="left">
+			</div>
+            <div class="col-md-2" align="left">
+                <button type="submit" class="btn btn-warning btn-xs" id="history" onclick="document.getElementById('history').style.visibility = 'hidden'">
+					Save to history
+				</button>
+            </div>
+            <div class="col-md-3" align="right">
+                <i class="glyphicon glyphicon-chevron-down" onclick="document.getElementById('map').style.height = '85%'"></i>
+                <i class="glyphicon glyphicon-chevron-up" onclick="document.getElementById('map').style.height = '96.5%'"></i>
+            </div>
+            <div class="col-md-5" align="right">
+				<span class="label label-default" id="loginButton">{{>loginButtons}}</span>
+            </div>
+			<div class="col-md-1" align="left">
+			</div>
+        </div>
+
+        <div id="header">
+            <table class="table table-condensed">
+                <tr>
+                    <td>
+                        {{#each blogs}}
+							<i class="glyphicon glyphicon-trash deleteQuery"></i> 
+							{{title}}<br> 
+						{{/each}}
+                    </td>
+                    <td>
+                        {{#each blogs}} 
+							{{location}}<br> 
+						{{/each}}
+                    </td>
+                    <td>
+                        {{#each blogs}} 
+							{{radius}} km<br> 
+						{{/each}}
+                    </td>
+                    <td>
+                        {{#each blogs}}
+							{{date}} - {{time}}<br> 
+						{{/each}}
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </form>
+
+    <label type="text" id="qlist"></label>
+    <label type="text" id="radiusList"></label>
+    <input id="pac-input" class="controls" type="text" placeholder="Search venue">
+    <div id='map'></div>
+    <div id="footer">
+        <table class="table">
+            <tr>
+                <td width=50%>
+					<p id="countList" align="left"></p>
+			    </td>
+                <td width=50%>
+					<h4>
+						<p align="right">
+							<button id="exportButton" class="btn btn-warning btn-xs active"> 
+								<a href="#" id="export">
+									<u>Export CSV</u>
+								</a>
+							</button>
+						</p>
+					</h4>
+                </td>
+            </tr>
+        </table>
+
+        <table class="table">
+            <tr>
+                <div id="datat">
+                    <table class="table" id="list">
+                        <tr id="row" align="center"></tr>
+                    </table>
+                </div>
+            </tr>
+        </table>
+    </div>
+</template>
