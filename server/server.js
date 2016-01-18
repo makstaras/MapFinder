@@ -28,6 +28,25 @@ Meteor.startup(function() {
             Roles.addUsersToRoles(userid, userData.roles);
         })
     }
+   
+});
+
+if (Meteor.isServer) {
+    Meteor.publish('blogs', function(){
+        return Blogs.find();
+    });   
+}
+
+ Blogs.allow({
+        update: ownsDocument,
+        remove: ownsDocument
+    });
+
+Blogs.deny({
+  update: function(userId, post, fieldNames) {
+    // разрешаем редактировать только следующие два поля:
+    return (_.without(fieldNames).length > 0);
+  }
 });
 
 Meteor.methods({
@@ -42,3 +61,5 @@ Meteor.methods({
         });
     }
 });
+
+

@@ -1,4 +1,6 @@
 if (Meteor.isClient) {
+	Meteor.subscribe("blogs");
+
 	Template.store.events({
 		'submit #blogForm': function(e) {
 			e.preventDefault();
@@ -23,7 +25,4 @@ if (Meteor.isClient) {
 			Blogs.remove(this._id);
 		}
 	});
-		
-		
-
 }
