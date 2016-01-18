@@ -1,5 +1,6 @@
 # MapFinder
-You can find places with markers on Google map \n
+You can find places with markers on Google map
+
 Also added allow and deny
 
 !!!
