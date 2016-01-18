@@ -28,7 +28,6 @@ Meteor.startup(function() {
             Roles.addUsersToRoles(userid, userData.roles);
         })
     }
-   
 });
 
 if (Meteor.isServer) {
@@ -61,5 +60,3 @@ Meteor.methods({
         });
     }
 });
-
-

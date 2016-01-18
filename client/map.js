@@ -17,7 +17,7 @@ if (Meteor.isClient) {
 	}),
 
 	Template.store.blogs = function(){
-		return Blogs.find({userId : Meteor.userId()});	
+		return Blogs.find({userId: Meteor.userId()});	
 	},
 
 	Template.store.events({
